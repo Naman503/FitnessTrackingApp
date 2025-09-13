@@ -17,7 +17,7 @@ interface RiskCategory {
   recommendations: string[];
 }
 
-export default function RiskMeterScreen() {
+export default function RisksScreen() {
   const { userDetails, goals } = useAppContext();
   const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
   const [selectedRisk, setSelectedRisk] = useState<RiskCategory | null>(null);

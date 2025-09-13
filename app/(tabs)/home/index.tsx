@@ -1,36 +1,62 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { AntDesign, MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '../../../context/AppContext';
 
 const { width } = Dimensions.get('window');
 
-const Dashboard = () => {
+const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 18) return 'Good Afternoon';
+  return 'Good Evening';
+};
+
+export default function HomeScreen() {
   const router = useRouter();
   const { userDetails, goals, completeGoal, updateStreak } = useAppContext();
   const [currentDate, setCurrentDate] = useState('');
-  const [greeting, setGreeting] = useState('');
-  const [activeTab, setActiveTab] = useState('today');
-
+  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // Refresh any data here if needed
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+  
+  // Update greeting based on time of day
   useEffect(() => {
-    // Update date and greeting
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    setCurrentDate(now.toLocaleDateString('en-US', options));
+    const updateGreeting = () => {
+      setGreeting(getTimeBasedGreeting());
+    };
     
-    const hours = now.getHours();
-    if (hours < 12) {
-      setGreeting('Good Morning');
-    } else if (hours < 18) {
-      setGreeting('Good Afternoon');
-    } else {
-      setGreeting('Good Evening');
-    }
-
-    // Update streak when component mounts (should ideally be done when app starts)
-    updateStreak();
+    // Update greeting when the hour changes
+    const now = new Date();
+    const timeToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+    
+    const timer = setTimeout(() => {
+      updateGreeting();
+      // Set interval to update greeting every hour
+      const interval = setInterval(updateGreeting, 60 * 60 * 1000);
+      return () => clearInterval(interval);
+    }, timeToNextHour);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  useEffect(() => {
+    // Update date
+    const now = new Date();
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    };
+    setCurrentDate(now.toLocaleDateString('en-US', options));
   }, []);
 
   const handleCompleteGoal = (goalId: string) => {
@@ -109,40 +135,66 @@ const Dashboard = () => {
   };
 
   const stats = [
-    { title: 'Today', value: goals.filter(g => g.completed).length, label: 'Goals' },
+    { title: 'Today', value: goals.filter((g: { completed: boolean }) => g.completed).length, label: 'Goals' },
     { title: 'Week', value: Math.floor(Math.random() * 15) + 5, label: 'Activities' },
     { title: 'Streak', value: userDetails?.streakCount || 0, label: 'Days' },
   ];
 
+  const renderStreakBadge = () => (
+    <View style={styles.streakBadge}>
+      <Ionicons name="flame" size={20} color="#FF6B6B" />
+      <Text style={styles.streakText}>{userDetails?.streakCount || 0} day streak</Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
+      {/* Header with Gradient */}
       <LinearGradient
         colors={['#6B46C1', '#805AD5']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.userName}>{userDetails?.name || 'User'}</Text>
-            <Text style={styles.date}>{currentDate}</Text>
-          </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push({ pathname: '/modal', params: { screen: 'profile' } } as never)}>
-            <FontAwesome5 name="user-circle" size={40} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.statsContainer}>
-          {stats.map((stat, index) => (
-            <View key={index} style={styles.statItem}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.title}</Text>
-              <Text style={styles.statSubLabel}>{stat.label}</Text>
+          <View style={styles.greetingContainer}>
+            <View>
+              <Text style={styles.greeting}>
+                {greeting}{userDetails?.name ? `, ${userDetails.name}` : ''}
+              </Text>
+              <Text style={styles.date}>{currentDate}</Text>
+              {userDetails?.streakCount ? renderStreakBadge() : null}
             </View>
-          ))}
+            <TouchableOpacity onPress={() => router.push('/modal')}>
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.statsContainer}>
+            {stats.map((stat, index) => (
+              <View key={index} style={styles.statItem}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.title}</Text>
+                <Text style={styles.statSubLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </LinearGradient>
       
-      <ScrollView style={styles.content}>
+      {/* Main Content */}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor="#6B46C1"
+            colors={['#6B46C1']}
+          />
+        }
+        bounces={true}
+      >
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Your Daily Goals</Text>
@@ -172,21 +224,30 @@ const Dashboard = () => {
             <Text style={styles.sectionTitle}>Quick Actions</Text>
           </View>
           <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push({ pathname: '/modal', params: { screen: 'add-activity' } })}>
+            <TouchableOpacity 
+              style={styles.quickAction} 
+              onPress={() => router.push({ pathname: '/modal', params: { screen: 'add-activity' } } as never)}
+            >
               <View style={[styles.quickActionIcon, { backgroundColor: '#4CAF50' }]}>
                 <MaterialIcons name="directions-run" size={24} color="#fff" />
               </View>
               <Text style={styles.quickActionText}>Add Activity</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push({ pathname: '/modal', params: { screen: 'nutrition' } } as never)}>
+            <TouchableOpacity 
+              style={styles.quickAction} 
+              onPress={() => router.push({ pathname: '/modal', params: { screen: 'nutrition' } } as never)}
+            >
               <View style={[styles.quickActionIcon, { backgroundColor: '#2196F3' }]}>
                 <MaterialIcons name="restaurant" size={24} color="#fff" />
               </View>
               <Text style={styles.quickActionText}>Log Food</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push({ pathname: '/modal', params: { screen: 'sleep' } } as never)}>
+            <TouchableOpacity 
+              style={styles.quickAction} 
+              onPress={() => router.push({ pathname: '/modal', params: { screen: 'sleep' } } as never)}
+            >
               <View style={[styles.quickActionIcon, { backgroundColor: '#9C27B0' }]}>
                 <MaterialIcons name="bedtime" size={24} color="#fff" />
               </View>
@@ -195,73 +256,6 @@ const Dashboard = () => {
           </View>
         </View>
       </ScrollView>
-      
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'today' && styles.tabItemActive]}
-          onPress={() => setActiveTab('today')}
-        >
-          <MaterialIcons 
-            name="home" 
-            size={24} 
-            color={activeTab === 'today' ? '#6B46C1' : '#888'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'today' && styles.tabTextActive]}>
-            Today
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'progress' && styles.tabItemActive]}
-          onPress={() => {
-            setActiveTab('progress');
-            router.push('/progress');
-          }}
-        >
-          <MaterialIcons 
-            name="show-chart" 
-            size={24} 
-            color={activeTab === 'progress' ? '#6B46C1' : '#888'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'progress' && styles.tabTextActive]}>
-            Progress
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'risks' && styles.tabItemActive]}
-          onPress={() => {
-            setActiveTab('risks');
-            router.push('/risks');
-          }}
-        >
-          <MaterialIcons 
-            name="warning" 
-            size={24} 
-            color={activeTab === 'risks' ? '#6B46C1' : '#888'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'risks' && styles.tabTextActive]}>
-            Risk Meter
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'profile' && styles.tabItemActive]}
-          onPress={() => {
-            setActiveTab('profile');
-            router.push({ pathname: '/modal', params: { screen: 'profile' } } as never);
-          }}
-        >
-          <MaterialIcons 
-            name="person" 
-            size={24} 
-            color={activeTab === 'profile' ? '#6B46C1' : '#888'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>
-            Profile
-          </Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -269,44 +263,66 @@ const Dashboard = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
+  },
+  headerContent: {
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     elevation: 5,
   },
-  headerContent: {
+  content: {
+    flex: 1,
+    padding: 16,
+    marginTop: -30,
+    zIndex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  scrollContent: {
+    paddingBottom: 30,
+    flexGrow: 1,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  streakText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  greetingContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 10,
   },
   greeting: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  userName: {
     color: '#fff',
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontWeight: '700',
+    marginBottom: 4,
+    fontFamily: 'System',
   },
   date: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-  },
-  profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    fontFamily: 'System',
+    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -314,45 +330,55 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   statItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 15,
-    borderRadius: 15,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
     alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 6,
+    shadowColor: '#6B46C1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statValue: {
-    color: '#fff',
+    color: '#333',
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   statLabel: {
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#666',
     fontSize: 14,
     fontWeight: '600',
   },
   statSubLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#999',
     fontSize: 12,
   },
-  content: {
-    flex: 1,
-    padding: 15,
-  },
   section: {
-    marginBottom: 25,
+    marginTop: 24,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#6B46C1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3748',
+    fontFamily: 'System',
   },
   seeAllText: {
     color: '#6B46C1',
@@ -361,14 +387,18 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EDF2F7',
+    shadowColor: '#6B46C1',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   goalHeader: {
     flexDirection: 'row',
@@ -465,58 +495,36 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 8,
   },
   quickAction: {
     alignItems: 'center',
-    width: (width - 60) / 3,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#F7FAFC',
+    marginHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   quickActionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   quickActionText: {
-    fontSize: 12,
-    color: '#333',
+    fontSize: 13,
+    color: '#4A5568',
     textAlign: 'center',
-    fontWeight: '500',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 5,
-    paddingBottom: 20,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  tabItemActive: {
-    // Active tab styling if needed
-  },
-  tabText: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
-  },
-  tabTextActive: {
-    color: '#6B46C1',
     fontWeight: '600',
+    marginTop: 2,
   },
 });
-
-export default Dashboard;

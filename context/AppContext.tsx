@@ -1,26 +1,29 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type UserDetails = {
   name: string;
+  email: string;
   age: string;
   phone: string;
   gender: string;
   activityLevel: string;
   completedOnboarding: boolean;
-  lastActiveDate?: string;
-  streakCount?: number;
+  lastActiveDate: string;
+  streakCount: number;
 };
 
 type AppContextType = {
   userDetails: UserDetails | null;
-  setUserDetails: (details: UserDetails) => void;
+  setUserDetails: (details: UserDetails | null) => void;
   isLoading: boolean;
   goals: Goal[];
   setGoals: (goals: Goal[]) => void;
+  addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'completed' | 'current'>) => void;
   completeGoal: (goalId: string) => void;
   swapGoal: (oldGoalId: string, newGoal: Goal) => void;
   updateStreak: () => void;
+  signOut: () => Promise<void>;
 };
 
 type Goal = {
@@ -78,14 +81,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
   const [goals, setGoalsState] = useState<Goal[]>([]);
 
-  // Load user details and goals from AsyncStorage on mount
+  const updateStreak = useCallback(async () => {
+    if (!userDetails) return;
+    
+    try {
+      const today = new Date().toDateString();
+      const lastActive = userDetails.lastActiveDate ? new Date(userDetails.lastActiveDate).toDateString() : null;
+      
+      // If user already active today, no need to update
+      if (lastActive === today) return;
+      
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toDateString();
+      
+      let newStreak = 1; // Default to 1 for new day
+      
+      if (lastActive === yesterdayStr) {
+        // Consecutive day
+        newStreak = (userDetails.streakCount || 0) + 1;
+      } else if (lastActive && lastActive !== today) {
+        // Not consecutive, reset streak
+        newStreak = 1;
+      }
+      
+      // Update user details with new streak and last active date
+      const updatedDetails = {
+        ...userDetails,
+        lastActiveDate: today,
+        streakCount: newStreak
+      };
+      
+      await AsyncStorage.setItem('userDetails', JSON.stringify(updatedDetails));
+      setUserDetailsState(updatedDetails);
+      
+      return updatedDetails;
+    } catch (error) {
+      console.error('Error updating streak:', error);
+      return null;
+    }
+  }, [userDetails]);
+  
+  // Load data on initial mount
   useEffect(() => {
     const loadData = async () => {
       try {
         // Load user details
         const userData = await AsyncStorage.getItem('userDetails');
         if (userData) {
-          setUserDetailsState(JSON.parse(userData));
+          const parsedUserData = JSON.parse(userData);
+          setUserDetailsState(parsedUserData);
+          
+          // Update streak if needed
+          const today = new Date().toDateString();
+          const lastActive = parsedUserData.lastActiveDate ? 
+            new Date(parsedUserData.lastActiveDate).toDateString() : null;
+            
+          if (lastActive !== today) {
+            await updateStreak();
+          }
         }
 
         // Load goals
@@ -105,22 +159,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     loadData();
-  }, []);
+  }, [updateStreak]);
 
-  // Save user details to AsyncStorage whenever they change
-  useEffect(() => {
-    const saveUserDetails = async () => {
-      if (userDetails) {
-        try {
-          await AsyncStorage.setItem('userDetails', JSON.stringify(userDetails));
-        } catch (error) {
-          console.error('Error saving user details:', error);
-        }
+  const setUserDetails = async (details: UserDetails | null) => {
+    setUserDetailsState(details);
+    try {
+      if (details) {
+        await AsyncStorage.setItem('userDetails', JSON.stringify(details));
+      } else {
+        await AsyncStorage.removeItem('userDetails');
       }
-    };
-
-    saveUserDetails();
-  }, [userDetails]);
+    } catch (error) {
+      console.error('Error saving user details:', error);
+    }
+  };
 
   // Save goals to AsyncStorage whenever they change
   useEffect(() => {
@@ -137,10 +189,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveGoals();
   }, [goals]);
 
-  const setUserDetails = (details: UserDetails) => {
-    setUserDetailsState(details);
-  };
-
   const setGoals = (newGoals: Goal[]) => {
     setGoalsState(newGoals);
   };
@@ -148,11 +196,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const completeGoal = (goalId: string) => {
     setGoalsState(prevGoals =>
       prevGoals.map(goal =>
-        goal.id === goalId
-          ? { ...goal, completed: true, current: goal.target }
-          : goal
+        goal.id === goalId ? { ...goal, completed: true } : goal
       )
     );
+  };
+
+  const addGoal = (goal: Omit<Goal, 'id' | 'createdAt' | 'completed' | 'current'>) => {
+    const newGoal: Goal = {
+      ...goal,
+      id: Date.now().toString(),
+      current: 0,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    setGoalsState(prevGoals => [...prevGoals, newGoal]);
   };
 
   const swapGoal = (oldGoalId: string, newGoal: Goal) => {
@@ -163,31 +220,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updateStreak = () => {
-    if (!userDetails) return;
-
-    const today = new Date().toDateString();
-    const lastActive = userDetails.lastActiveDate
-      ? new Date(userDetails.lastActiveDate).toDateString()
-      : null;
-
-    // If we already updated the streak today, do nothing
-    if (lastActive === today) return;
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    const newStreakCount =
-      !lastActive || lastActive === yesterdayStr
-        ? (userDetails.streakCount || 0) + 1
-        : 1;
-
-    setUserDetails({
-      ...userDetails,
-      lastActiveDate: today,
-      streakCount: newStreakCount,
-    });
+  const signOut = async () => {
+    try {
+      await AsyncStorage.removeItem('userDetails');
+      setUserDetailsState(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   return (
@@ -200,13 +239,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setGoals,
         completeGoal,
         swapGoal,
+        addGoal,
         updateStreak,
+        signOut,
       }}
     >
       {children}
     </AppContext.Provider>
   );
 };
+
+export default AppContext;
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
