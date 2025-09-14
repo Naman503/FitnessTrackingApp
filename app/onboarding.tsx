@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useState, useRef } from 'react';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import appLogo from '@/assets/images/app_logo.png';
+import { useAppContext } from '@/context/AppContext';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type FormData = {
   name: string;
@@ -19,7 +21,22 @@ type FormErrors = {
   activityLevel?: string;
 };
 
+const THEME_COLORS = {
+  primary: '#4F46E5',
+  secondary: '#EC4899',
+  success: '#22C55E',
+  warning: '#EAB308',
+  info: '#06B6D4',
+  background: '#F9FAFB',
+  card: '#FFFFFF',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  white: '#FFFFFF',
+  error: '#EF4444',
+};
+
 export default function OnboardingScreen() {
+  const { setUserDetails } = useAppContext();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -30,29 +47,51 @@ export default function OnboardingScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    // Logo pop animation on each step entry
+    Animated.spring(logoScale, {
+      toValue: 1,
+      friction: 4,
+      useNativeDriver: true,
+    }).start();
+  }, [step, fadeAnim, slideAnim, logoScale]);
 
   const validateStep = (currentStep: number): boolean => {
     const newErrors: FormErrors = {};
     
-    if (currentStep === 1 && !formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-    
     if (currentStep === 2) {
+      if (!formData.name.trim()) {
+        newErrors.name = 'Name is required';
+      }
       if (!formData.age) {
         newErrors.age = 'Age is required';
       } else if (isNaN(Number(formData.age)) || Number(formData.age) < 1 || Number(formData.age) > 120) {
         newErrors.age = 'Please enter a valid age (1-120)';
       }
-      
       if (!formData.gender) {
         newErrors.gender = 'Please select a gender';
       }
-    }
-    
-    if (currentStep === 3 && !formData.activityLevel) {
-      newErrors.activityLevel = 'Please select an activity level';
+      if (!formData.activityLevel) {
+        newErrors.activityLevel = 'Please select an activity level';
+      }
     }
     
     setErrors(newErrors);
@@ -64,25 +103,84 @@ export default function OnboardingScreen() {
       return;
     }
     
+    if (step === 2) {
+      // Move to the final step (step 3) instead of redirecting immediately
+      setStep(3);
+      return;
+    }
+    
+    if (step === 3) {
+      // Final submission from the completion screen
+      try {
+        setIsSubmitting(true);
+        const name = formData.name.trim();
+        const email = `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+        const phone = '+1234567890';
+        const now = new Date().toISOString();
+        const userDetails = {
+          name,
+          email,
+          age: formData.age,
+          phone,
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          completedOnboarding: true,
+          lastActiveDate: now,
+          streakCount: 1,
+        };
+        await setUserDetails(userDetails);
+        router.replace('/');
+      } catch (error) {
+        console.error('Error saving user details:', error);
+        Alert.alert('Error', 'Failed to save your information. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     if (step < 3) {
-      setStep(step + 1);
-      // Scroll to top when changing steps
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -100,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setStep(step + 1);
+        slideAnim.setValue(100);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
     } else {
       try {
         setIsSubmitting(true);
-        // Save user details and mark onboarding as complete
+        // Generate sensible defaults for missing fields
+        const name = formData.name.trim();
+        const email = `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+        const phone = '+1234567890';
+        const now = new Date().toISOString();
         const userDetails = {
-          ...formData,
+          name,
+          email,
+          age: formData.age,
+          phone,
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
           completedOnboarding: true,
-          onboardedAt: new Date().toISOString(),
-          lastActiveDate: new Date().toISOString(),
+          lastActiveDate: now,
           streakCount: 1,
         };
-        
-        await AsyncStorage.setItem('userDetails', JSON.stringify(userDetails));
-        
-        // Simple navigation to tabs
+        await setUserDetails(userDetails); // Use AppContext to save
         router.replace('/');
       } catch (error) {
         console.error('Error saving user details:', error);
@@ -95,9 +193,27 @@ export default function OnboardingScreen() {
   
   const handlePrevious = () => {
     if (step > 1) {
-      setStep(step - 1);
-      // Scroll to top when changing steps
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 100,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setStep(step - 1);
+        slideAnim.setValue(-100);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
     }
   };
   
@@ -106,8 +222,6 @@ export default function OnboardingScreen() {
       ...prev,
       [field]: value
     }));
-    
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -116,58 +230,117 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleGoToDashboard = async () => {
+    try {
+      setIsSubmitting(true);
+      const name = formData.name.trim();
+      const email = `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+      const phone = '+1234567890';
+      const now = new Date().toISOString();
+      const userDetails = {
+        name,
+        email,
+        age: formData.age,
+        phone,
+        gender: formData.gender,
+        activityLevel: formData.activityLevel,
+        completedOnboarding: true,
+        lastActiveDate: now,
+        streakCount: 1,
+      };
+      await setUserDetails(userDetails);
+      router.replace('/');
+    } catch (error) {
+      console.error('Error saving user details:', error);
+      Alert.alert('Error', 'Failed to save your information. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderStep = () => {
     switch (step) {
+      case 3:
+        return (
+          <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+            <View style={styles.header}>
+              <Text style={styles.title}>All Set! 🎉</Text>
+              <Text style={styles.subtitle}>Your profile is ready. Let's start your health journey!</Text>
+            </View>
+            <View style={styles.completionContainer}>
+              <View style={styles.completionCard}>
+                <MaterialIcons name="check-circle" size={60} color={THEME_COLORS.success} />
+                <Text style={styles.completionTitle}>Profile Complete</Text>
+                <Text style={styles.completionText}>You're all set to explore Fyxlife and track your health journey.</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.dashboardButton}
+              onPress={handleGoToDashboard}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.dashboardButtonText}>
+                {isSubmitting ? 'Loading...' : 'Go to Dashboard'}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        );
       case 1:
         return (
-          <View style={styles.stepContainer}>
+          <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
             <View style={styles.header}>
-              <Text style={styles.title}>Welcome to Fyxlife</Text>
-              <Text style={styles.subtitle}>Let's get started with your health journey</Text>
+              <Image source={appLogo} style={styles.logo} resizeMode="contain" />
+              <Text style={styles.title}>Hello!</Text>
+              <Text style={styles.subtitle}>Welcome to Fyxlife - Your health journey starts here.</Text>
             </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Your Name</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.name && styles.inputError
-                ]}
-                placeholder="Enter your full name"
-                value={formData.name}
-                onChangeText={(text) => updateFormData('name', text)}
-                autoCapitalize="words"
-                autoCorrect={false}
-                returnKeyType="next"
-                onSubmitEditing={() => {
-                  if (formData.name.trim()) {
-                    handleNext();
-                  }
-                }}
-              />
-              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-            </View>
-            
+            <TouchableOpacity onPress={handleNext} activeOpacity={0.9}>
+              <LinearGradient
+                colors={[THEME_COLORS.card, THEME_COLORS.white]}
+                start={{x:0,y:0}}
+                end={{x:1,y:1}}
+                style={styles.startButton}
+              >
+                <Text style={styles.startButtonText}>Start</Text>
+              </LinearGradient>
+            </TouchableOpacity>
             <View style={styles.stepIndicatorContainer}>
               {[1, 2, 3].map((i) => (
                 <View 
                   key={i} 
                   style={[
                     styles.stepDot, 
-                    i === step && styles.stepDotActive,
-                    i < step && styles.stepDotCompleted
+                    i <= step && styles.stepDotActive
                   ]} 
                 />
               ))}
             </View>
-          </View>
+          </Animated.View>
         );
       case 2:
         return (
-          <View style={styles.stepContainer}>
+          <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
             <View style={styles.header}>
-              <Text style={styles.title}>Tell us about yourself</Text>
-              <Text style={styles.subtitle}>This helps us personalize your experience</Text>
+              <Text style={styles.title}>Create Your Profile</Text>
+              <Text style={styles.subtitle}>Tell us about yourself</Text>
+            </View>
+            
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.name && styles.inputError
+                ]}
+                placeholder="Enter your full name"
+                placeholderTextColor={THEME_COLORS.textSecondary}
+                value={formData.name}
+                onChangeText={(text) => updateFormData('name', text)}
+                autoCapitalize="words"
+                autoCorrect={false}
+                returnKeyType="done"
+                inputAccessoryViewID="main"
+              />
+              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
             
             <View style={styles.formGroup}>
@@ -178,16 +351,18 @@ export default function OnboardingScreen() {
                   errors.age && styles.inputError
                 ]}
                 placeholder="Enter your age"
+                placeholderTextColor={THEME_COLORS.textSecondary}
                 value={formData.age}
                 onChangeText={(text) => updateFormData('age', text.replace(/[^0-9]/g, ''))}
                 keyboardType="number-pad"
                 maxLength={3}
-                returnKeyType="next"
+                returnKeyType="done"
+                inputAccessoryViewID="main"
               />
               {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
             </View>
             
-            <View style={[styles.formGroup, styles.genderGroup]}>
+            <View style={styles.formGroup}>
               <Text style={styles.label}>Gender</Text>
               <View style={styles.genderOptions}>
                 {['Male', 'Female', 'Other'].map((item) => (
@@ -211,29 +386,8 @@ export default function OnboardingScreen() {
               {errors.gender && <Text style={styles.errorText}>{errors.gender}</Text>}
             </View>
             
-            <View style={styles.stepIndicatorContainer}>
-              {[1, 2, 3].map((i) => (
-                <View 
-                  key={i} 
-                  style={[
-                    styles.stepDot, 
-                    i === step && styles.stepDotActive,
-                    i < step && styles.stepDotCompleted
-                  ]} 
-                />
-              ))}
-            </View>
-          </View>
-        );
-      case 3:
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.header}>
-              <Text style={styles.title}>Activity Level</Text>
-              <Text style={styles.subtitle}>How active are you on a weekly basis?</Text>
-            </View>
-            
-            <View style={[styles.formGroup, styles.activityGroup]}>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Activity Level</Text>
               {[
                 { level: 'Sedentary', desc: 'Little to no exercise' },
                 { level: 'Lightly Active', desc: 'Light exercise 1-3 days/week' },
@@ -264,13 +418,11 @@ export default function OnboardingScreen() {
                     </Text>
                   </View>
                   {formData.activityLevel === item.level && (
-                    <MaterialIcons name="check-circle" size={24} color="#6B46C1" />
+                    <MaterialIcons name="check-circle" size={24} color={THEME_COLORS.primary} />
                   )}
                 </TouchableOpacity>
               ))}
-              {errors.activityLevel && (
-                <Text style={[styles.errorText, { marginTop: 8 }]}>{errors.activityLevel}</Text>
-              )}
+              {errors.activityLevel && <Text style={styles.errorText}>{errors.activityLevel}</Text>}
             </View>
             
             <View style={styles.stepIndicatorContainer}>
@@ -279,13 +431,39 @@ export default function OnboardingScreen() {
                   key={i} 
                   style={[
                     styles.stepDot, 
-                    i === step && styles.stepDotActive,
-                    i < step && styles.stepDotCompleted
+                    i <= step && styles.stepDotActive
                   ]} 
                 />
               ))}
             </View>
-          </View>
+          </Animated.View>
+        );
+      case 3:
+        return (
+          <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
+            <View style={styles.header}>
+              <Image source={appLogo} style={styles.logo} resizeMode="contain" />
+              <Text style={styles.title}>Profile Created!</Text>
+              <Text style={styles.subtitle}>Your health journey is ready to begin.</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.dashboardButton}
+              onPress={() => router.replace('/')}
+            >
+              <Text style={styles.dashboardButtonText}>Go to Dashboard</Text>
+            </TouchableOpacity>
+            <View style={styles.stepIndicatorContainer}>
+              {[1, 2, 3].map((i) => (
+                <View 
+                  key={i} 
+                  style={[
+                    styles.stepDot, 
+                    i <= step && styles.stepDotActive
+                  ]} 
+                />
+              ))}
+            </View>
+          </Animated.View>
         );
       default:
         return null;
@@ -298,7 +476,9 @@ export default function OnboardingScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#6B46C1', '#8B5FBF']}
+        colors={[THEME_COLORS.primary, THEME_COLORS.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <ScrollView 
@@ -309,42 +489,38 @@ export default function OnboardingScreen() {
           {renderStep()}
         </ScrollView>
         
-        <View style={styles.footer}>
-          {step > 1 ? (
-            <TouchableOpacity 
-              style={styles.navButton}
+        {(step === 2) && (
+          <View style={[styles.footer, { paddingBottom: 24 + insets.bottom, flexDirection: 'row', gap: 14, backgroundColor: 'transparent', borderTopLeftRadius: 0, borderTopRightRadius: 0, shadowOpacity: 0 }]}>
+            <TouchableOpacity
+              style={styles.backButtonModern}
               onPress={handlePrevious}
               disabled={isSubmitting}
+              activeOpacity={0.8}
             >
-              <MaterialIcons name="arrow-back" size={20} color="#6B46C1" />
-              <Text style={styles.navButtonText}>Back</Text>
+              <MaterialIcons name="arrow-back" size={22} color={THEME_COLORS.primary} />
             </TouchableOpacity>
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
-          
-          <TouchableOpacity 
-            style={[
-              styles.nextButton,
-              isSubmitting && styles.nextButtonDisabled
-            ]}
-            onPress={handleNext}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.nextButtonText}>
-                  {step === 3 ? 'Get Started' : 'Continue'}
-                </Text>
-                {step < 3 && (
-                  <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+
+            <TouchableOpacity
+              activeOpacity={0.92}
+              style={{ flex: 1 }}
+              onPress={handleNext}
+              disabled={isSubmitting}
+            >
+              <LinearGradient
+                colors={[THEME_COLORS.card, THEME_COLORS.primary, THEME_COLORS.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.nextButtonModern, isSubmitting && styles.nextButtonDisabled]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color={THEME_COLORS.white} />
+                ) : (
+                  <Text style={styles.nextButtonTextModern}>Continue</Text>
                 )}
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
       </LinearGradient>
     </KeyboardAvoidingView>
   );
@@ -353,197 +529,286 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   gradient: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 20,
-    paddingBottom: 30,
-  },
-  header: {
-    marginBottom: 32,
-    alignItems: 'center',
+    marginTop:24,
+    paddingHorizontal: 24,
+    paddingVertical: 40,
   },
   stepContainer: {
     flex: 1,
-    justifyContent: 'space-between',
-    width: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  logoWrapper:{
+    width:200,
+    height:200,
+    borderRadius:100,
+    backgroundColor:'rgba(255,255,255,0.15)',
+    justifyContent:'center',
+    alignItems:'center',
+    marginBottom:24,
+  },
+  logo: {
+    width:240,
+    height:240,
+    elevation:6,
+    shadowColor:'#000',
+    shadowOffset:{width:0,height:4},
+    shadowOpacity:0.15,
+    shadowRadius:10,
+    
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: THEME_COLORS.white,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 26,
+    maxWidth: '80%',
   },
   formGroup: {
     marginBottom: 24,
     width: '100%',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    maxWidth: '90%',
-    lineHeight: 22,
-  },
   label: {
     fontSize: 16,
-    color: '#fff',
-    marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: THEME_COLORS.white,
+    marginBottom: 12,
   },
   input: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: THEME_COLORS.card,
+    padding: 16,
+    borderRadius: 12,
     fontSize: 16,
-    color: '#333',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    color: THEME_COLORS.textPrimary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   inputError: {
-    borderColor: '#ff6b6b',
     borderWidth: 1,
+    borderColor: THEME_COLORS.error,
   },
   errorText: {
-    color: '#ff6b6b',
+    color: THEME_COLORS.error,
     fontSize: 14,
-    marginTop: 4,
-    marginLeft: 4,
+    marginTop: 8,
   },
-  optionButton: {
+  genderOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  genderOption: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
+    marginHorizontal: 6,
+    alignItems: 'center',
   },
-  activityGroup: {
-    marginBottom: 20,
+  genderOptionSelected: {
+    backgroundColor: THEME_COLORS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  genderText: {
+    color: THEME_COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  genderTextSelected: {
+    color: THEME_COLORS.primary,
   },
   activityOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   activityOptionSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderColor: '#fff',
+    backgroundColor: THEME_COLORS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
   },
   activityContent: {
     flex: 1,
   },
   activityText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: THEME_COLORS.white,
     fontSize: 16,
-    marginBottom: 2,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   activityTextSelected: {
-    color: '#6B46C1',
+    color: THEME_COLORS.primary,
   },
   activityDesc: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 13,
+    fontSize: 14,
   },
   activityDescSelected: {
-    color: '#666',
+    color: THEME_COLORS.textSecondary,
   },
   stepIndicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 32,
   },
   stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    marginHorizontal: 4,
+    marginHorizontal: 6,
   },
   stepDotActive: {
-    backgroundColor: '#fff',
-  },
-  stepDotCompleted: {
-    backgroundColor: '#fff',
-  },
-  genderGroup: {
-    marginBottom: 32,
-  },
-  genderOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  genderOption: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginHorizontal: 4,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  genderOptionSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderColor: '#fff',
-  },
-  genderText: {
-    color: '#fff',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  genderTextSelected: {
-    color: '#6B46C1',
-    fontWeight: '600',
+    backgroundColor: THEME_COLORS.white,
+    width: 12,
+    height: 12,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    padding: 16,
+    backgroundColor: THEME_COLORS.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    width:'100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  navButtonText: {
-    fontSize: 16,
-    color: '#6B46C1',
-    marginLeft: 8,
-  },
-  nextButton: {
+  backButtonModern: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#fff',
-    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+    marginRight: 2,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: THEME_COLORS.primary,
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  nextButtonModern: {
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#A3BFFA',
+  },
+  nextButtonTextModern: {
+    fontSize: 18,
+    color: THEME_COLORS.white,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  startButton:{
+    paddingVertical:16,
+    paddingHorizontal:48,
+    borderRadius:24,
+    alignItems:'center',
+  },
+  startButtonText: {
+    fontSize: 18,
+    color: THEME_COLORS.primary,
+    fontWeight: '700',
+  },
+  dashboardButton: {
+    backgroundColor: THEME_COLORS.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    marginTop: 32,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  nextButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  nextButtonText: {
+  dashboardButtonText: {
+    color: THEME_COLORS.white,
     fontSize: 18,
-    color: '#6B46C1',
-    fontWeight: 'bold',
-    marginRight: 8,
+    fontWeight: '700',
+  },
+  completionContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 32,
+  },
+  completionCard: {
+    backgroundColor: THEME_COLORS.card,
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  completionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: THEME_COLORS.textPrimary,
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  completionText: {
+    fontSize: 16,
+    color: THEME_COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 16,
   },
 });

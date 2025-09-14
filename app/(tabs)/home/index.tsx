@@ -1,372 +1,818 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
+import { useAppContext } from '@/context/AppContext';
+import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { AntDesign, MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '../../../context/AppContext';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle
+} from 'react-native';
 
+// Types
+type HomeHeaderProps = {
+  greeting: string;
+  name?: string;
+  currentDate: string;
+  onProfilePress: () => void;
+};
+
+type StreakCardProps = {
+  count: number;
+};
+
+type GoalItemProps = {
+  goal: {
+    id: string;
+    title: string;
+    completed: boolean;
+    progress?: number;
+    target?: number;
+    category?: string;
+  };
+  onComplete?: (id: string) => void;
+};
+
+type QuickActionProps = {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  bgColor: string;
+  onPress: () => void;
+};
+
+type StatsCardProps = {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  color: string;
+  trend?: 'up' | 'down' | 'neutral';
+};
+
+interface Styles {
+  // Layout
+  safeArea: ViewStyle;
+  content: ViewStyle;
+  container: ViewStyle;
+  scrollContent: ViewStyle;
+  flex1: ViewStyle;
+  flexRow: ViewStyle;
+  flexCol: ViewStyle;
+  itemsCenter: ViewStyle;
+  justifyCenter: ViewStyle;
+  justifyBetween: ViewStyle;
+  alignItems: ViewStyle;
+  
+  // Header
+  header: ViewStyle;
+  headerGradient: ViewStyle;
+  greetingSection: ViewStyle;
+  greeting: TextStyle;
+  userName: TextStyle;
+  date: TextStyle;
+  profileButton: ViewStyle;
+  profileIconContainer: ViewStyle;
+  headerContent: ViewStyle;
+  headerTitle: TextStyle;
+  headerSubtitle: TextStyle;
+  greetingContainer: ViewStyle;
+  
+  // Cards
+  card: ViewStyle;
+  cardContent: ViewStyle;
+  goalCard: ViewStyle;
+  modernGoalCard: ViewStyle;
+  goalCardHeader: ViewStyle;
+  goalCategoryBadge: ViewStyle;
+  goalCategoryText: TextStyle;
+  goalStatus: ViewStyle;
+  goalCompleted: ViewStyle;
+  completedGoalTitle: TextStyle;
+  goalProgressSection: ViewStyle;
+  
+  // Streak Card
+  streakCard: ViewStyle;
+  streakContent: ViewStyle;
+  streakIcon: ViewStyle;
+  streakLabel: TextStyle;
+  streakCount: TextStyle;
+  streakText: TextStyle;
+  streakBadge: ViewStyle;
+  streakTextSection: ViewStyle;
+  streakMotivation: TextStyle;
+  streakVisual: ViewStyle;
+  flameContainer: ViewStyle;
+  streakDots: ViewStyle;
+  streakDot: ViewStyle;
+  
+  // Goals
+  goalsContainer: ViewStyle;
+  goalsScrollContainer: ViewStyle;
+  goalsHeader: ViewStyle;
+  goalsTitle: TextStyle;
+  goalsList: ViewStyle;
+  goalItem: ViewStyle;
+  goalContent: ViewStyle;
+  goalCheckbox: ViewStyle;
+  goalCheckboxChecked: ViewStyle;
+  goalCheckboxCompleted: ViewStyle;
+  goalText: TextStyle;
+  goalTextCompleted: TextStyle;
+  completedGoalText: TextStyle;
+  goalDate: TextStyle;
+  goalHeader: ViewStyle;
+  goalIcon: ViewStyle;
+  goalTitle: TextStyle;
+  moreButton: ViewStyle;
+  
+  // Progress
+  progressContainer: ViewStyle;
+  progressBar: ViewStyle;
+  progressFill: ViewStyle;
+  progressText: TextStyle;
+  
+  // Quick Actions
+  quickActions: ViewStyle;
+  quickAction: ViewStyle;
+  quickActionIcon: ViewStyle;
+  quickActionText: TextStyle;
+  
+  // Actions
+  actionsContainer: ViewStyle;
+  actionsHeader: ViewStyle;
+  actionsTitle: TextStyle;
+  actionsGrid: ViewStyle;
+  actionButton: ViewStyle;
+  actionButtonContent: ViewStyle;
+  actionButtonText: TextStyle;
+  actionIcon: ViewStyle;
+  actionText: TextStyle;
+  
+  // Empty States
+  emptyState: ViewStyle;
+  emptyText: TextStyle;
+  emptyStateText: TextStyle;
+  emptyGoalsContainer: ViewStyle;
+  emptyIcon: ViewStyle;
+  emptyTitle: TextStyle;
+  emptySubtitle: TextStyle;
+  noGoals: ViewStyle;
+  noGoalsText: TextStyle;
+  
+  // Buttons
+  addButton: ViewStyle;
+  addButtonText: TextStyle;
+  createGoalButton: ViewStyle;
+  createGoalButtonText: TextStyle;
+  seeAllButton: ViewStyle;
+  seeAllText: TextStyle;
+  
+  // Badges
+  completedBadge: ViewStyle;
+  completedText: TextStyle;
+  
+  // Sections
+  section: ViewStyle;
+  sectionHeader: ViewStyle;
+  sectionTitle: TextStyle;
+  seeAll: TextStyle;
+  
+  // Stats
+  statsSection: ViewStyle;
+  statsCard: ViewStyle;
+  statsHeader: ViewStyle;
+  statsIcon: ViewStyle;
+  statsValue: TextStyle;
+  statsLabel: TextStyle;
+  trendIndicator: ViewStyle;
+  statsContainer: ViewStyle;
+  statItem: ViewStyle;
+  statValue: TextStyle;
+  statLabel: TextStyle;
+  
+  // Utility
+  refreshControl: ViewStyle;
+  bottomSpacing: ViewStyle;
+};
+
+// Constants
 const { width } = Dimensions.get('window');
+const CARD_SPACING = 16;
+const THEME_COLORS = {
+  primary: '#4F46E5',
+  secondary: '#EC4899',
+  success: '#22C55E',
+  warning: '#EAB308',
+  info: '#06B6D4',
+  background: '#F9FAFB',
+  card: '#FFFFFF',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+};
 
+// Helper Functions
 const getTimeBasedGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good Morning';
-  if (hour < 18) return 'Good Afternoon';
+  if (hour < 17) return 'Good Afternoon';
   return 'Good Evening';
 };
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const { userDetails, goals, completeGoal, updateStreak } = useAppContext();
-  const [currentDate, setCurrentDate] = useState('');
-  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    // Refresh any data here if needed
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
-  
-  // Update greeting based on time of day
-  useEffect(() => {
-    const updateGreeting = () => {
-      setGreeting(getTimeBasedGreeting());
-    };
-    
-    // Update greeting when the hour changes
-    const now = new Date();
-    const timeToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
-    
-    const timer = setTimeout(() => {
-      updateGreeting();
-      // Set interval to update greeting every hour
-      const interval = setInterval(updateGreeting, 60 * 60 * 1000);
-      return () => clearInterval(interval);
-    }, timeToNextHour);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  useEffect(() => {
-    // Update date
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    setCurrentDate(now.toLocaleDateString('en-US', options));
-  }, []);
-
-  const handleCompleteGoal = (goalId: string) => {
-    completeGoal(goalId);
-    // You could add haptic feedback here
-  };
-
-  const renderGoalCard = (goal: any) => (
-    <View key={goal.id} style={styles.goalCard}>
-      <View style={styles.goalHeader}>
-        <View style={[styles.goalIcon, { backgroundColor: getCategoryColor(goal.category) }]}>
-          <Ionicons name="checkmark-circle" size={24} color="#fff" />
-        </View>
-        <Text style={styles.goalTitle}>{goal.title}</Text>
-        <TouchableOpacity 
-          style={styles.moreButton}
-          onPress={() => router.push({ pathname: '/modal', params: { screen: 'goal-details', id: goal.id } } as never)}
-        >
-          <AntDesign name="ellipsis" size={20} color="#666" />
-        </TouchableOpacity>
+// Enhanced Components
+const HomeHeader = ({ greeting, name, currentDate, onProfilePress }: HomeHeaderProps) => (
+  <LinearGradient
+    colors={[THEME_COLORS.primary, THEME_COLORS.primary + 'CC']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.headerGradient}
+  >
+    <View style={styles.headerContent}>
+      <View style={styles.greetingSection}>
+        <Text style={styles.greeting}>{greeting},</Text>
+        <Text style={styles.userName}>{name || 'User'}</Text>
+        <Text style={styles.date}>{currentDate}</Text>
       </View>
-      
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                width: `${(goal.current / goal.target) * 100}%`,
-                backgroundColor: getCategoryColor(goal.category)
-              }
-            ]} 
+      <TouchableOpacity 
+        style={styles.profileButton}
+        onPress={onProfilePress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.profileIconContainer}>
+          <Feather name="user" size={24} color={THEME_COLORS.primary} />
+        </View>
+      </TouchableOpacity>
+    </View>
+  </LinearGradient>
+);
+
+const StatsCard = ({ title, value, icon, color, trend = 'neutral' }: StatsCardProps) => (
+  <View style={[styles.statsCard, { borderColor: color }]}>
+    <View style={styles.statsHeader}>
+      <View style={[styles.statsIcon, { backgroundColor: color + '10' }]}>
+        {icon}
+      </View>
+      {trend !== 'neutral' && (
+        <View style={[styles.trendIndicator, { backgroundColor: trend === 'up' ? THEME_COLORS.success : THEME_COLORS.secondary }]}>
+          <Ionicons 
+            name={trend === 'up' ? 'arrow-up' : 'arrow-down'} 
+            size={14} 
+            color="#fff" 
           />
-        </View>
-        <Text style={styles.progressText}>
-          {goal.current} / {goal.target} {goal.unit}
-        </Text>
-      </View>
-      
-      {!goal.completed ? (
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: getCategoryColor(goal.category) }]}
-          onPress={() => handleCompleteGoal(goal.id)}
-        >
-          <Text style={styles.actionButtonText}>Mark as Complete</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.completedBadge}>
-          <AntDesign name="check-circle" size={16} color="#4CAF50" />
-          <Text style={styles.completedText}>Completed</Text>
         </View>
       )}
     </View>
+    <Text style={styles.statsValue}>{value}</Text>
+    <Text style={styles.statsLabel}>{title}</Text>
+  </View>
+);
+
+const StreakCard = ({ count }: StreakCardProps) => {
+  const scaleAnim = new Animated.Value(1);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [scaleAnim]);
+
+  return (
+    <LinearGradient
+      colors={[THEME_COLORS.warning, THEME_COLORS.secondary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.streakCard}
+    >
+      <View style={styles.streakContent}>
+        <View style={styles.streakTextSection}>
+          <Text style={styles.streakLabel}>Current Streak</Text>
+          <Text style={styles.streakCount}>{count}</Text>
+          <Text style={styles.streakMotivation}>days on fire!</Text>
+        </View>
+        <Animated.View style={[styles.flameContainer, { transform: [{ scale: scaleAnim }] }]}>
+          <Ionicons name="flame" size={48} color="#FFFFFF" />
+        </Animated.View>
+      </View>
+    </LinearGradient>
+  );
+};
+
+const EnhancedGoalItem = ({ goal, onComplete }: GoalItemProps) => {
+  const progress = goal.progress || 0;
+  const categoryColors = {
+    Activity: THEME_COLORS.success,
+    Nutrition: THEME_COLORS.warning,
+    Sleep: THEME_COLORS.info,
+    Wellness: THEME_COLORS.primary,
+  };
+  const color = categoryColors[goal.category as keyof typeof categoryColors] || THEME_COLORS.textSecondary;
+
+  return (
+    <TouchableOpacity 
+      style={styles.modernGoalCard}
+      onPress={() => onComplete?.(goal.id)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.goalCardHeader}>
+        <View style={[styles.goalCategoryBadge, { backgroundColor: color + '10' }]}>
+          <Text style={[styles.goalCategoryText, { color }]}>
+            {goal.category || 'General'}
+          </Text>
+        </View>
+        <View style={[styles.goalStatus, goal.completed && styles.goalCompleted]}>
+          <Ionicons name={goal.completed ? "checkmark-circle" : "ellipse-outline"} size={20} color={goal.completed ? "#FFFFFF" : color} />
+        </View>
+      </View>
+      
+      <Text style={[styles.goalTitle, goal.completed && styles.completedGoalTitle]} numberOfLines={2}>
+        {goal.title}
+      </Text>
+      
+      {!goal.completed && progress > 0 && (
+        <View style={styles.goalProgressSection}>
+          <View style={styles.progressBar}>
+            <Animated.View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: color }]} />
+          </View>
+          <Text style={styles.progressText}>{progress}%</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const QuickAction = ({ icon, label, color, bgColor, onPress }: QuickActionProps) => (
+  <TouchableOpacity 
+    style={[styles.quickAction, { backgroundColor: bgColor }]}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <View style={[styles.quickActionIcon, { backgroundColor: color + '10', borderColor: color + '20' }]}>
+      {icon}
+    </View>
+    <Text style={[styles.quickActionText, { color: THEME_COLORS.textPrimary }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const { userDetails, goals = [], completeGoal, updateStreak } = useAppContext();
+  const [currentDate, setCurrentDate] = useState('');
+  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+  const [refreshing, setRefreshing] = useState(false);
+  const [streakCount, setStreakCount] = useState(0);
+  const [animatedValue] = useState(new Animated.Value(0));
+  
+  const handleCompleteGoal = useCallback(async (goalId: string) => {
+    if (completeGoal) {
+      await completeGoal(goalId);
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 500);
+    }
+  }, [completeGoal]);
+  
+  const loadStreakCount = useCallback(async () => {
+    try {
+      const storedStreak = await AsyncStorage.getItem('appStreak');
+      const today = new Date().toDateString();
+      
+      if (storedStreak) {
+        const { count, lastOpened } = JSON.parse(storedStreak);
+        const lastOpenedDate = new Date(lastOpened).toDateString();
+        
+        if (today === lastOpenedDate) {
+          setStreakCount(count);
+        } else {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          if (lastOpenedDate === yesterday.toDateString()) {
+            const newCount = count + 1;
+            await AsyncStorage.setItem('appStreak', JSON.stringify({
+              count: newCount,
+              lastOpened: new Date().toISOString()
+            }));
+            setStreakCount(newCount);
+          } else {
+            await AsyncStorage.setItem('appStreak', JSON.stringify({
+              count: 1,
+              lastOpened: new Date().toISOString()
+            }));
+            setStreakCount(1);
+          }
+        }
+      } else {
+        await AsyncStorage.setItem('appStreak', JSON.stringify({
+          count: 1,
+          lastOpened: new Date().toISOString()
+        }));
+        setStreakCount(1);
+      }
+    } catch (error) {
+      console.error('Error loading streak:', error);
+    }
+  }, []);
+  
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadStreakCount();
+    await updateStreak?.();
+    
+    Animated.sequence([
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedValue, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    setRefreshing(false);
+  }, [loadStreakCount, updateStreak, animatedValue]);
+  
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      setGreeting(getTimeBasedGreeting());
+      setCurrentDate(now.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric'
+      }));
+    };
+    
+    updateDateTime();
+    loadStreakCount();
+    
+    const timer = setInterval(updateDateTime, 60000);
+    return () => clearInterval(timer);
+  }, [loadStreakCount]);
+
+  const renderStatsSection = () => (
+    <View style={styles.statsSection}>
+      <StatsCard 
+        title="Goals Today"
+        value={`${goals.filter(g => g.completed).length}/${goals.length}`}
+        icon={<MaterialIcons name="track-changes" size={20} color={THEME_COLORS.success} />}
+        color={THEME_COLORS.success}
+        trend="up"
+      />
+      <StatsCard 
+        title="Weekly Progress"
+        value="85%"
+        icon={<MaterialCommunityIcons name="calendar-week" size={20} color={THEME_COLORS.primary} />}
+        color={THEME_COLORS.primary}
+        trend="up"
+      />
+      <StatsCard 
+        title="Streak"
+        value={`${streakCount}d`}
+        icon={<Ionicons name="flame" size={20} color={THEME_COLORS.warning} />}
+        color={THEME_COLORS.warning}
+        trend={streakCount > 0 ? 'up' : 'neutral'}
+      />
+    </View>
   );
 
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      Activity: '#4CAF50',
-      Nutrition: '#2196F3',
-      Sleep: '#9C27B0',
-      Mindfulness: '#FF9800',
-      default: '#607D8B',
-    };
-    return colors[category] || colors.default;
+  const renderGoals = () => {
+    if (!goals?.length) {
+      return (
+        <View style={styles.emptyGoalsContainer}>
+          <View style={styles.emptyIcon}>
+            <MaterialCommunityIcons name="lightbulb-on-outline" size={60} color={THEME_COLORS.textSecondary} />
+          </View>
+          <Text style={styles.emptyTitle}>Start Your Journey</Text>
+          <Text style={styles.emptySubtitle}>Add your first goal and take the first step towards better wellness</Text>
+          <TouchableOpacity 
+            style={styles.createGoalButton}
+            onPress={() => router.push('/modal?screen=add-goal')}
+          >
+            <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.createGoalButtonText}>Create Goal</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.goalsScrollContainer}
+        decelerationRate="fast"
+        snapToInterval={width * 0.7 + CARD_SPACING / 2}
+        snapToAlignment="start"
+      >
+        {goals.slice(0, 5).map((goal) => (
+          <EnhancedGoalItem 
+            key={goal.id} 
+            goal={{
+              ...goal,
+              progress: Math.floor(Math.random() * 100), // Mock progress for demo
+              category: ['Activity', 'Nutrition', 'Sleep', 'Wellness'][Math.floor(Math.random() * 4)]
+            }} 
+            onComplete={handleCompleteGoal} 
+          />
+        ))}
+        <View style={{ width: CARD_SPACING }} />
+      </ScrollView>
+    );
   };
 
-  const getCategoryIcon = (category: string) => {
-    const icons: { [key: string]: string } = {
-      Activity: 'ios-walk',
-      Nutrition: 'ios-restaurant',
-      Sleep: 'ios-moon',
-      Mindfulness: 'ios-leaf',
-      default: 'ios-checkmark-circle',
-    };
-    return icons[category] || icons.default;
-  };
-
-  const stats = [
-    { title: 'Today', value: goals.filter((g: { completed: boolean }) => g.completed).length, label: 'Goals' },
-    { title: 'Week', value: Math.floor(Math.random() * 15) + 5, label: 'Activities' },
-    { title: 'Streak', value: userDetails?.streakCount || 0, label: 'Days' },
-  ];
-
-  const renderStreakBadge = () => (
-    <View style={styles.streakBadge}>
-      <Ionicons name="flame" size={20} color="#FF6B6B" />
-      <Text style={styles.streakText}>{userDetails?.streakCount || 0} day streak</Text>
+  const renderQuickActions = () => (
+    <View style={styles.quickActions}>
+      <QuickAction 
+        icon={<MaterialCommunityIcons name="meditation" size={28} color={THEME_COLORS.primary} />}
+        label="Meditate"
+        color={THEME_COLORS.primary}
+        bgColor={THEME_COLORS.card}
+        onPress={() => router.push('/modal?screen=meditation')}
+      />
+      <QuickAction 
+        icon={<FontAwesome5 name="running" size={28} color={THEME_COLORS.secondary} />}
+        label="Workout"
+        color={THEME_COLORS.secondary}
+        bgColor={THEME_COLORS.card}
+        onPress={() => router.push('/modal?screen=workout')}
+      />
+      <QuickAction 
+        icon={<Ionicons name="bed-outline" size={28} color={THEME_COLORS.info} />}
+        label="Sleep Track"
+        color={THEME_COLORS.info}
+        bgColor={THEME_COLORS.card}
+        onPress={() => router.push('/modal?screen=sleep')}
+      />
+      <QuickAction 
+        icon={<MaterialCommunityIcons name="food-apple" size={28} color={THEME_COLORS.warning} />}
+        label="Nutrition"
+        color={THEME_COLORS.warning}
+        bgColor={THEME_COLORS.card}
+        onPress={() => router.push('/modal?screen=nutrition')}
+      />
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#6B46C1', '#805AD5']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.greetingContainer}>
-            <View>
-              <Text style={styles.greeting}>
-                {greeting}{userDetails?.name ? `, ${userDetails.name}` : ''}
-              </Text>
-              <Text style={styles.date}>{currentDate}</Text>
-              {userDetails?.streakCount ? renderStreakBadge() : null}
-            </View>
-            <TouchableOpacity onPress={() => router.push('/modal')}>
-              <Ionicons name="notifications-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.statsContainer}>
-            {stats.map((stat, index) => (
-              <View key={index} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.title}</Text>
-                <Text style={styles.statSubLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </LinearGradient>
-      
-      {/* Main Content */}
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+    
+      <ScrollView style={styles.container}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
-            onRefresh={onRefresh}
-            tintColor="#6B46C1"
-            colors={['#6B46C1']}
+            onRefresh={onRefresh} 
+            tintColor={THEME_COLORS.primary}
+            colors={[THEME_COLORS.primary]}
+            progressBackgroundColor={THEME_COLORS.card}
           />
         }
-        bounces={true}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Daily Goals</Text>
-            <TouchableOpacity onPress={() => router.push({ pathname: '/modal', params: { screen: 'all-goals' } } as never)}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {goals.length > 0 ? (
-            goals.map(renderGoalCard)
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialIcons name="add-circle" size={50} color="#ccc" />
-              <Text style={styles.emptyStateText}>No goals yet</Text>
-              <TouchableOpacity 
-                style={styles.addButton}
-                onPress={() => router.push({ pathname: '/modal', params: { screen: 'add-goal' } } as never)}
-              >
-                <Text style={styles.addButtonText}>Add Your First Goal</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+        <HomeHeader 
+          greeting={greeting}
+          name={userDetails?.name}
+          currentDate={currentDate}
+          onProfilePress={() => router.push('/profile')}
+        />
+        
+        {renderStatsSection()}
+        
+        <StreakCard count={streakCount} />
         
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-          </View>
-          <View style={styles.quickActions}>
+            <Text style={styles.sectionTitle}>Today's Goals</Text>
             <TouchableOpacity 
-              style={styles.quickAction} 
-              onPress={() => router.push({ pathname: '/modal', params: { screen: 'add-activity' } } as never)}
+              onPress={() => router.push('/modal?screen=goals')}
+              style={styles.seeAllButton}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#4CAF50' }]}>
-                <MaterialIcons name="directions-run" size={24} color="#fff" />
-              </View>
-              <Text style={styles.quickActionText}>Add Activity</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickAction} 
-              onPress={() => router.push({ pathname: '/modal', params: { screen: 'nutrition' } } as never)}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#2196F3' }]}>
-                <MaterialIcons name="restaurant" size={24} color="#fff" />
-              </View>
-              <Text style={styles.quickActionText}>Log Food</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickAction} 
-              onPress={() => router.push({ pathname: '/modal', params: { screen: 'sleep' } } as never)}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#9C27B0' }]}>
-                <MaterialIcons name="bedtime" size={24} color="#fff" />
-              </View>
-              <Text style={styles.quickActionText}>Sleep</Text>
+              <Text style={styles.seeAllText}>View All</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME_COLORS.primary} />
             </TouchableOpacity>
           </View>
+          {renderGoals()}
         </View>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          {renderQuickActions()}
+        </View>
+        
+        <View style={styles.bottomSpacing} />
       </ScrollView>
-    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // iOS Status Bar
+  iosStatusBar: {
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  iosStatusBarContent: {
+    height: Platform.OS === 'ios' ? 44 : 0,
+  },
+  
+  // Layout
+  safeArea: {
+    flex: 1,
+    backgroundColor: THEME_COLORS.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  headerContent: {
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    elevation: 5,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-    marginTop: -30,
-    zIndex: 1,
     backgroundColor: '#f8f9fa',
   },
   scrollContent: {
-    paddingBottom: 30,
-    flexGrow: 1,
+    paddingBottom: 120,
   },
-  streakBadge: {
-    flexDirection: 'row',
+  bottomSpacing: {
+    height: 40,
+  },
+
+  header: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 8,
-    alignSelf: 'flex-start',
+    paddingTop: 60,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
   },
-  streakText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4,
+  // Header
+  headerGradient: {
+    paddingHorizontal: CARD_SPACING,
+    paddingTop: 120,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
   },
-  greetingContainer: {
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 10,
+  },
+  greetingSection: {
+    flex: 1,
   },
   greeting: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
+  },
+  userName: {
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
     marginBottom: 4,
-    fontFamily: 'System',
   },
   date: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 15,
-    fontFamily: 'System',
-    opacity: 0.9,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontWeight: '400',
   },
-  statsContainer: {
+  profileButton: {
+    marginLeft: 16,
+  },
+  profileIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  // Stats Section
+  statsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: CARD_SPACING,
+    marginTop: -24,
+    marginBottom: 24,
+    gap: 12,
+  },
+  statsCard: {
+    backgroundColor: THEME_COLORS.card,
+    borderRadius: 24,
+    padding: 16,
+    flex: 1,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  statItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 6,
-    shadowColor: '#6B46C1',
-    shadowOffset: { width: 0, height: 4 },
+    marginBottom: 12,
+  },
+  statsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: THEME_COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  statsLabel: {
+    fontSize: 13,
+    color: THEME_COLORS.textSecondary,
+    fontWeight: '500',
+  },
+
+  // Streak Card
+  streakCard: {
+    marginHorizontal: CARD_SPACING,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 16,
     elevation: 4,
   },
-  statValue: {
-    color: '#333',
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 5,
+  streakContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  statLabel: {
-    color: '#666',
+  streakTextSection: {
+    flex: 1,
+  },
+  streakLabel: {
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  streakCount: {
+    color: '#FFFFFF',
+    fontSize: 40,
+    fontWeight: 'bold',
+  },
+  streakMotivation: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 16,
     fontWeight: '600',
   },
-  statSubLabel: {
-    color: '#999',
-    fontSize: 12,
+  flameContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  // Sections
   section: {
-    marginTop: 24,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#6B46C1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 32,
+    paddingHorizontal: CARD_SPACING,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -375,156 +821,173 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2D3748',
-    fontFamily: 'System',
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: THEME_COLORS.textPrimary,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   seeAllText: {
-    color: '#6B46C1',
-    fontSize: 14,
-    fontWeight: '500',
+    color: THEME_COLORS.primary,
+    fontSize: 15,
+    fontWeight: '600',
+    marginRight: 4,
   },
-  goalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EDF2F7',
-    shadowColor: '#6B46C1',
-    shadowOffset: { width: 0, height: 2 },
+
+  // Goals
+  goalsScrollContainer: {
+    paddingRight: CARD_SPACING,
+  },
+  modernGoalCard: {
+    width: width * 0.7,
+    backgroundColor: THEME_COLORS.card,
+    borderRadius: 24,
+    padding: 20,
+    marginRight: CARD_SPACING / 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 8,
     elevation: 2,
   },
-  goalHeader: {
+  goalCardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  goalIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  goalCategoryBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  goalCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  goalStatus: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+  },
+  goalCompleted: {
+    backgroundColor: THEME_COLORS.success,
   },
   goalTitle: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#333',
+    color: THEME_COLORS.textPrimary,
+    lineHeight: 24,
   },
-  moreButton: {
-    padding: 5,
+  completedGoalTitle: {
+    color: THEME_COLORS.textSecondary,
+    textDecorationLine: 'line-through',
   },
-  progressContainer: {
-    marginBottom: 15,
+  goalProgressSection: {
+    marginTop: 16,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: THEME_COLORS.background,
     borderRadius: 4,
-    marginBottom: 5,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     borderRadius: 4,
   },
   progressText: {
+    fontSize: 13,
+    color: THEME_COLORS.textSecondary,
+    fontWeight: '500',
     textAlign: 'right',
-    fontSize: 12,
-    color: '#666',
   },
-  actionButton: {
-    padding: 12,
-    borderRadius: 8,
+
+  // Empty States
+  emptyGoalsContainer: {
+    backgroundColor: THEME_COLORS.card,
+    borderRadius: 24,
+    padding: 32,
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  actionButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: THEME_COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  completedBadge: {
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: THEME_COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: THEME_COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  createGoalButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-  },
-  completedText: {
-    color: '#4CAF50',
-    marginLeft: 5,
-    fontWeight: '600',
-  },
-  emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 10,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  addButton: {
-    backgroundColor: '#6B46C1',
-    paddingHorizontal: 20,
+    backgroundColor: THEME_COLORS.primary,
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 25,
+    borderRadius: 16,
   },
-  addButtonText: {
-    color: '#fff',
+  createGoalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
+
+  // Quick Actions
   quickActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 8,
+    gap: 12,
   },
   quickAction: {
+    width: '48%',
+    borderRadius: 24,
+    padding: 20,
     alignItems: 'center',
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#F7FAFC',
-    marginHorizontal: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   quickActionIcon: {
     width: 56,
     height: 56,
-    borderRadius: 16,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    marginBottom: 16,
+    borderWidth: 1,
   },
   quickActionText: {
-    fontSize: 13,
-    color: '#4A5568',
-    textAlign: 'center',
+    fontSize: 16,
     fontWeight: '600',
-    marginTop: 2,
   },
 });

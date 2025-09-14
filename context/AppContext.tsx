@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-type UserDetails = {
+export type UserDetails = {
   name: string;
   email: string;
   age: string;
@@ -36,6 +36,7 @@ type Goal = {
   category: string;
   completed: boolean;
   createdAt: string;
+  progress: number;
 };
 
 const defaultGoals: Goal[] = [
@@ -49,6 +50,7 @@ const defaultGoals: Goal[] = [
     category: 'Activity',
     completed: false,
     createdAt: new Date().toISOString(),
+    progress: 0,
   },
   {
     id: '2',
@@ -60,6 +62,7 @@ const defaultGoals: Goal[] = [
     category: 'Nutrition',
     completed: false,
     createdAt: new Date().toISOString(),
+    progress: 0,
   },
   {
     id: '3',
@@ -71,6 +74,7 @@ const defaultGoals: Goal[] = [
     category: 'Activity',
     completed: false,
     createdAt: new Date().toISOString(),
+    progress: 0,
   },
 ];
 
@@ -82,14 +86,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [goals, setGoalsState] = useState<Goal[]>([]);
 
   const updateStreak = useCallback(async () => {
-    if (!userDetails) return;
+    if (!userDetails) return null;
     
     try {
       const today = new Date().toDateString();
-      const lastActive = userDetails.lastActiveDate ? new Date(userDetails.lastActiveDate).toDateString() : null;
+      const lastActive = userDetails.lastActiveDate 
+        ? new Date(userDetails.lastActiveDate).toDateString() 
+        : null;
       
       // If user already active today, no need to update
-      if (lastActive === today) return;
+      if (lastActive === today) return userDetails;
       
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
@@ -105,17 +111,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         newStreak = 1;
       }
       
-      // Update user details with new streak and last active date
-      const updatedDetails = {
-        ...userDetails,
-        lastActiveDate: today,
-        streakCount: newStreak
-      };
+      // Only update if there's a change
+      if (newStreak !== userDetails.streakCount || lastActive !== today) {
+        const updatedDetails = {
+          ...userDetails,
+          lastActiveDate: today,
+          streakCount: newStreak
+        };
+        
+        await AsyncStorage.setItem('userDetails', JSON.stringify(updatedDetails));
+        setUserDetailsState(updatedDetails);
+        return updatedDetails;
+      }
       
-      await AsyncStorage.setItem('userDetails', JSON.stringify(updatedDetails));
-      setUserDetailsState(updatedDetails);
-      
-      return updatedDetails;
+      return userDetails;
     } catch (error) {
       console.error('Error updating streak:', error);
       return null;
@@ -124,42 +133,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Load data on initial mount
   useEffect(() => {
+    let isMounted = true;
+    
     const loadData = async () => {
       try {
         // Load user details
         const userData = await AsyncStorage.getItem('userDetails');
-        if (userData) {
+        if (userData && isMounted) {
           const parsedUserData = JSON.parse(userData);
-          setUserDetailsState(parsedUserData);
           
-          // Update streak if needed
+          // Check if we need to update the streak
           const today = new Date().toDateString();
-          const lastActive = parsedUserData.lastActiveDate ? 
-            new Date(parsedUserData.lastActiveDate).toDateString() : null;
-            
+          const lastActive = parsedUserData.lastActiveDate 
+            ? new Date(parsedUserData.lastActiveDate).toDateString() 
+            : null;
+          
           if (lastActive !== today) {
             await updateStreak();
+          } else {
+            setUserDetailsState(parsedUserData);
           }
         }
 
         // Load goals
         const goalsData = await AsyncStorage.getItem('goals');
-        if (goalsData) {
-          setGoalsState(JSON.parse(goalsData));
-        } else {
-          // Set default goals if none exist
-          setGoalsState(defaultGoals);
-          await AsyncStorage.setItem('goals', JSON.stringify(defaultGoals));
+        if (isMounted) {
+          if (goalsData) {
+            setGoalsState(JSON.parse(goalsData));
+          } else {
+            // Set default goals if none exist
+            const initialGoals = [...defaultGoals];
+            setGoalsState(initialGoals);
+            await AsyncStorage.setItem('goals', JSON.stringify(initialGoals));
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadData();
-  }, [updateStreak]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Removed updateStreak from dependencies to prevent loops
 
   const setUserDetails = async (details: UserDetails | null) => {
     setUserDetailsState(details);

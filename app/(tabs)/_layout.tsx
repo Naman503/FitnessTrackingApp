@@ -1,8 +1,8 @@
-import { Tabs } from 'expo-router';
-import { useColorScheme, Platform, Animated } from 'react-native';
-import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
+import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { Animated, Platform, useColorScheme } from 'react-native';
 
 type TabBarIconProps = {
   focused: boolean;
@@ -40,6 +40,7 @@ export default function TabLayout() {
   const tabBarHeight = Platform.OS === 'ios' ? 90 : 70;
 
   return (
+    <>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
@@ -118,5 +119,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

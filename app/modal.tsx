@@ -358,6 +358,7 @@ const AddGoalScreen = () => {
         target: Number(target),
         unit: getUnitForCategory(category),
         category,
+        progress: 0
       });
       router.back();
     }
