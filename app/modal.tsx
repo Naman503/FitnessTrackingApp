@@ -395,7 +395,7 @@ const MeditationScreen = () => {
   const router = useRouter();
   const [sessionStarted, setSessionStarted] = useState(false);
   const [timer, setTimer] = useState(600); // 10 minutes
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   const startSession = () => {
     setSessionStarted(true);

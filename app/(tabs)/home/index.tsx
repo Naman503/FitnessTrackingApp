@@ -357,10 +357,8 @@ export default function HomeScreen() {
   const [streakCount, setStreakCount] = useState(0);
   const [animatedValue] = useState(new Animated.Value(0));
   
-  const handleToggleGoal = useCallback(async (goalId: string) => {
+  const handleToggleGoal = useCallback((goalId: string) => {
     toggleGoalComplete?.(goalId);
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 400);
   }, [toggleGoalComplete]);
 
   const handleDeleteGoal = useCallback((goalId: string) => {
