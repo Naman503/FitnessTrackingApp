@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 32,
+    marginBottom: 10,
   },
   workoutCard: {
     width: '48%',
@@ -1491,7 +1491,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     width: '100%',
-    marginTop: 16,
   },
   disabledButton: {
     opacity: 0.5,

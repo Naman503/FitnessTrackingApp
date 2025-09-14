@@ -200,32 +200,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Save goals to AsyncStorage whenever they change (including empty state)
+  // Load goals on initial mount
   useEffect(() => {
-    const saveGoals = async () => {
+    const loadGoals = async () => {
       try {
-        await AsyncStorage.setItem('goals', JSON.stringify(goals));
+        const goalsData = await AsyncStorage.getItem('goals');
+        if (goalsData) {
+          const parsedGoals = JSON.parse(goalsData);
+          setGoalsState(parsedGoals);
+        } else {
+          // Set default goals if none exist
+          const initialGoals = [...defaultGoals];
+          await AsyncStorage.setItem('goals', JSON.stringify(initialGoals));
+          setGoalsState(initialGoals);
+        }
       } catch (error) {
-        console.error('Error saving goals:', error);
+        console.error('Error loading goals:', error);
+        // In case of error, set default goals
+        const initialGoals = [...defaultGoals];
+        await AsyncStorage.setItem('goals', JSON.stringify(initialGoals));
+        setGoalsState(initialGoals);
       }
     };
 
-    saveGoals();
-  }, [goals]);
+    loadGoals();
+  }, []);
 
-  const setGoals = (newGoals: Goal[]) => {
-    setGoalsState(newGoals);
-  };
+  const setGoals = useCallback(async (newGoals: Goal[]) => {
+    try {
+      setGoalsState(newGoals);
+      await AsyncStorage.setItem('goals', JSON.stringify(newGoals));
+    } catch (error) {
+      console.error('Error saving goals in setGoals:', error);
+    }
+  }, []);
 
-  const completeGoal = (goalId: string) => {
-    setGoalsState(prevGoals =>
-      prevGoals.map(goal =>
+  const completeGoal = useCallback((goalId: string) => {
+    setGoalsState(prevGoals => {
+      const updatedGoals = prevGoals.map(goal =>
         goal.id === goalId ? { ...goal, completed: true } : goal
-      )
-    );
-  };
+      );
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
-  const addGoal = (goal: Omit<Goal, 'id' | 'createdAt' | 'completed' | 'current'>) => {
+  const addGoal = useCallback(async (goal: Omit<Goal, 'id' | 'createdAt' | 'completed' | 'current'>) => {
     const newGoal: Goal = {
       ...goal,
       id: Date.now().toString(),
@@ -234,32 +255,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
       progress: 0,
     };
-    setGoalsState(prevGoals => [...prevGoals, newGoal]);
-  };
+    setGoalsState(prevGoals => {
+      const updatedGoals = [...prevGoals, newGoal];
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
-  const swapGoal = (oldGoalId: string, newGoal: Goal) => {
-    setGoalsState(prevGoals =>
-      prevGoals.map(goal =>
+  const swapGoal = useCallback((oldGoalId: string, newGoal: Goal) => {
+    setGoalsState(prevGoals => {
+      const updatedGoals = prevGoals.map(goal =>
         goal.id === oldGoalId ? { ...newGoal, id: oldGoalId } : goal
-      )
-    );
-  };
+      );
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
-  const toggleGoalComplete = (goalId: string) => {
-    setGoalsState(prevGoals =>
-      prevGoals.map(goal =>
+  const toggleGoalComplete = useCallback((goalId: string) => {
+    setGoalsState(prevGoals => {
+      const updatedGoals = prevGoals.map(goal =>
         goal.id === goalId ? { ...goal, completed: !goal.completed } : goal
-      )
-    );
-  };
+      );
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
-  const deleteGoal = (goalId: string) => {
-    setGoalsState(prevGoals => prevGoals.filter(goal => goal.id !== goalId));
-  };
+  const deleteGoal = useCallback((goalId: string) => {
+    setGoalsState(prevGoals => {
+      const updatedGoals = prevGoals.filter(goal => goal.id !== goalId);
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
-  const updateGoalCurrent = (goalId: string, newCurrent: number) => {
-    setGoalsState(prevGoals =>
-      prevGoals.map(goal => {
+  const updateGoalCurrent = useCallback((goalId: string, newCurrent: number) => {
+    setGoalsState(prevGoals => {
+      const updatedGoals = prevGoals.map(goal => {
         if (goal.id !== goalId) return goal;
         const safeTarget = goal.target || 0;
         const clampedCurrent = Math.max(0, newCurrent);
@@ -270,9 +307,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           progress,
           completed: safeTarget > 0 ? clampedCurrent >= safeTarget : goal.completed,
         };
-      })
-    );
-  };
+      });
+      // Save to AsyncStorage after state update
+      AsyncStorage.setItem('goals', JSON.stringify(updatedGoals)).catch(console.error);
+      return updatedGoals;
+    });
+  }, []);
 
   const resetGoalsToDefault = async () => {
     try {
