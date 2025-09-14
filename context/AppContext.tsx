@@ -21,7 +21,11 @@ type AppContextType = {
   setGoals: (goals: Goal[]) => void;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'completed' | 'current'>) => void;
   completeGoal: (goalId: string) => void;
+  toggleGoalComplete: (goalId: string) => void;
+  deleteGoal: (goalId: string) => void;
+  updateGoalCurrent: (goalId: string, newCurrent: number) => void;
   swapGoal: (oldGoalId: string, newGoal: Goal) => void;
+  resetGoalsToDefault: () => Promise<void>;
   updateStreak: () => void;
   signOut: () => Promise<void>;
 };
@@ -196,15 +200,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Save goals to AsyncStorage whenever they change
+  // Save goals to AsyncStorage whenever they change (including empty state)
   useEffect(() => {
     const saveGoals = async () => {
-      if (goals.length > 0) {
-        try {
-          await AsyncStorage.setItem('goals', JSON.stringify(goals));
-        } catch (error) {
-          console.error('Error saving goals:', error);
-        }
+      try {
+        await AsyncStorage.setItem('goals', JSON.stringify(goals));
+      } catch (error) {
+        console.error('Error saving goals:', error);
       }
     };
 
@@ -230,6 +232,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       current: 0,
       completed: false,
       createdAt: new Date().toISOString(),
+      progress: 0,
     };
     setGoalsState(prevGoals => [...prevGoals, newGoal]);
   };
@@ -242,10 +245,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const toggleGoalComplete = (goalId: string) => {
+    setGoalsState(prevGoals =>
+      prevGoals.map(goal =>
+        goal.id === goalId ? { ...goal, completed: !goal.completed } : goal
+      )
+    );
+  };
+
+  const deleteGoal = (goalId: string) => {
+    setGoalsState(prevGoals => prevGoals.filter(goal => goal.id !== goalId));
+  };
+
+  const updateGoalCurrent = (goalId: string, newCurrent: number) => {
+    setGoalsState(prevGoals =>
+      prevGoals.map(goal => {
+        if (goal.id !== goalId) return goal;
+        const safeTarget = goal.target || 0;
+        const clampedCurrent = Math.max(0, newCurrent);
+        const progress = safeTarget > 0 ? Math.min(100, Math.round((clampedCurrent / safeTarget) * 100)) : 0;
+        return {
+          ...goal,
+          current: clampedCurrent,
+          progress,
+          completed: safeTarget > 0 ? clampedCurrent >= safeTarget : goal.completed,
+        };
+      })
+    );
+  };
+
+  const resetGoalsToDefault = async () => {
+    try {
+      const initialGoals = [...defaultGoals];
+      setGoalsState(initialGoals);
+      await AsyncStorage.setItem('goals', JSON.stringify(initialGoals));
+    } catch (error) {
+      console.error('Error resetting goals:', error);
+    }
+  };
+
   const signOut = async () => {
     try {
       await AsyncStorage.removeItem('userDetails');
       setUserDetailsState(null);
+      // Reset goals to defaults on sign out
+      const initialGoals = [...defaultGoals];
+      setGoalsState(initialGoals);
+      await AsyncStorage.setItem('goals', JSON.stringify(initialGoals));
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -260,8 +306,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         goals,
         setGoals,
         completeGoal,
+        toggleGoalComplete,
+        deleteGoal,
+        updateGoalCurrent,
         swapGoal,
         addGoal,
+        resetGoalsToDefault,
         updateStreak,
         signOut,
       }}
