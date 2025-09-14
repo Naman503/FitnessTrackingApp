@@ -61,22 +61,63 @@ Android Emulator
 
 Physical Device (via Expo Go app)
 
-📸 Screenshots
-Dashboard
-<p align="center"> <img src="./assets/screenShort/Dashboard.png" width="200"/> <img src="./assets/screenShort/Dashboard0.png" width="200"/> <img src="./assets/screenShort/Dashboard1.png" width="200"/> <img src="./assets/screenShort/Dashboard2.png" width="200"/> <img src="./assets/screenShort/Dashboard3.png" width="200"/> </p>
-Profile
-<p align="center"> <img src="./assets/screenShort/profile1.png" width="200"/> <img src="./assets/screenShort/profile2.png" width="200"/> </p>
-Progress Tracking
-<p align="center"> <img src="./assets/screenShort/progress1.png" width="200"/> <img src="./assets/screenShort/progress2.png" width="200"/> </p>
-Risk Analysis
-<p align="center"> <img src="./assets/screenShort/risk1.png" width="200"/> <img src="./assets/screenShort/risk2.png" width="200"/> </p>
-Sleep Tracking
-<p align="center"> <img src="./assets/screenShort/sleep.png" width="200"/> </p>
-Nutrition
-<p align="center"> <img src="./assets/screenShort/nutrition.png" width="200"/> </p>
-Workout
-<p align="center"> <img src="./assets/screenShort/workout.png" width="200"/> </p>
+📸 **Screenshots**
 
+---
+
+### Dashboard  
+<p align="center">
+  <img src="./assets/screenShort/Dashboard0.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/Dashboard1.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/Dashboard2.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/Dashboard3.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Profile  
+<p align="center">
+  <img src="./assets/screenShort/profile1.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/profile2.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Progress Tracking  
+<p align="center">
+  <img src="./assets/screenShort/progress1.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/progress3.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/progress4.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Risk Analysis  
+<p align="center">
+  <img src="./assets/screenShort/risk1.png" width="200" style="margin:10px"/> 
+  <img src="./assets/screenShort/risk2.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Sleep Tracking  
+<p align="center">
+  <img src="./assets/screenShort/sleep.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Nutrition  
+<p align="center">
+  <img src="./assets/screenShort/nutrition.png" width="200" style="margin:10px"/> 
+</p>
+
+---
+
+### Workout  
+<p align="center">
+  <img src="./assets/screenShort/workout.png" width="200" style="margin:10px"/> 
+</p>
 ### 🛠 Frameworks & Tools
 React Native (Expo) – Cross-platform framework
 
