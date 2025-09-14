@@ -238,28 +238,41 @@ export default function ProgressScreen() {
     </View>
   );
 
-  const renderActivitiesTab = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.activitiesContainer}>
-        {/* Assuming activities data; mock for now */}
-        {goals.filter(g => !g.completed).map((goal) => (
-          <View key={goal.id} style={styles.activityCard}>
-            <View style={styles.activityIcon}>
-              <MaterialIcons name="directions-run" size={28} color="#FFFFFF" />
+  const renderActivitiesTab = () => {
+    const activeGoals = goals.filter(g => !g.completed);
+    
+    return (
+      <View style={styles.tabContent}>
+        <View style={styles.activitiesContainer}>
+          {activeGoals.length > 0 ? (
+            activeGoals.map((goal) => (
+              <View key={goal.id} style={styles.activityCard}>
+                <View style={styles.activityIcon}>
+                  <MaterialIcons name="directions-run" size={28} color="#FFFFFF" />
+                </View>
+                <View style={styles.activityDetails}>
+                  <Text style={styles.activityTitle}>{goal.title}</Text>
+                  <Text style={styles.activityTime}>Ongoing</Text>
+                  <Text style={styles.activityStats}>Progress: {goal.progress || 0}%</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyStateIcon}>
+                <MaterialIcons name="directions-run" size={48} color={THEME_COLORS.textSecondary} />
+              </View>
+              <Text style={styles.emptyStateTitle}>No Active Activities</Text>
+              <Text style={styles.emptyStateText}>
+                You don't have any activities in progress right now. 
+                Start a new activity to track your progress!
+              </Text>
             </View>
-            <View style={styles.activityDetails}>
-              <Text style={styles.activityTitle}>{goal.title}</Text>
-              <Text style={styles.activityTime}>Ongoing</Text>
-              <Text style={styles.activityStats}>Progress: {goal.progress || 0}%</Text>
-            </View>
-          </View>
-        ))}
-        {goals.length === 0 && (
-          <Text style={styles.emptyText}>No activities yet</Text>
-        )}
+          )}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -566,6 +579,37 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   bottomSpacing: {
-    height: 40,
+    height: 100,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginTop: 40,
+  },
+  emptyStateIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: THEME_COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    opacity: 0.8,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: THEME_COLORS.textPrimary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: THEME_COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    opacity: 0.9,
   },
 });
