@@ -22,7 +22,7 @@ Here are some previews of various pages of the app:
 
 | Home | Profile | Goals |
 |------|---------|-------|
-| ![Home](./assets/screenShort/home.png) | ![Profile](./assets/screenShort/profile.png) | ![Goals](./assets/screenShort/goals.png) |
+| ![Home](./assets/screenShort/Dashboard1.png) | ![Profile](./assets/screenShort/Dashboard.png) | ![Goals](./assets/screenShort/progress2.png) |
 
 ---
 
@@ -60,6 +60,22 @@ iOS Simulator (Mac only)
 Android Emulator
 
 Physical Device (via Expo Go app)
+
+📸 Screenshots
+Dashboard
+<p align="center"> <img src="./assets/screenShort/Dashboard.png" width="200"/> <img src="./assets/screenShort/Dashboard0.png" width="200"/> <img src="./assets/screenShort/Dashboard1.png" width="200"/> <img src="./assets/screenShort/Dashboard2.png" width="200"/> <img src="./assets/screenShort/Dashboard3.png" width="200"/> </p>
+Profile
+<p align="center"> <img src="./assets/screenShort/profile1.png" width="200"/> <img src="./assets/screenShort/profile2.png" width="200"/> </p>
+Progress Tracking
+<p align="center"> <img src="./assets/screenShort/progress1.png" width="200"/> <img src="./assets/screenShort/progress2.png" width="200"/> </p>
+Risk Analysis
+<p align="center"> <img src="./assets/screenShort/risk1.png" width="200"/> <img src="./assets/screenShort/risk2.png" width="200"/> </p>
+Sleep Tracking
+<p align="center"> <img src="./assets/screenShort/sleep.png" width="200"/> </p>
+Nutrition
+<p align="center"> <img src="./assets/screenShort/nutrition.png" width="200"/> </p>
+Workout
+<p align="center"> <img src="./assets/screenShort/workout.png" width="200"/> </p>
 
 ### 🛠 Frameworks & Tools
 React Native (Expo) – Cross-platform framework
