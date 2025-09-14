@@ -20,9 +20,9 @@ Watch a screen recording of the working app here:
 
 Here are some previews of various pages of the app:
 
-| Home | Profile | Goals |
+| Onbording | Dashboard | Progress |
 |------|---------|-------|
-| ![Home](./assets/screenShort/Dashboard1.png) | ![Profile](./assets/screenShort/Dashboard.png) | ![Goals](./assets/screenShort/progress2.png) |
+| ![Onbording](./assets/screenShort/Dashboard1.png) | ![Dashboard](./assets/screenShort/Dashboard.png) | ![Progress](./assets/screenShort/progress2.png) |
 
 ---
 
