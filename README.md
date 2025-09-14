@@ -1,50 +1,99 @@
-# Welcome to your Expo app 👋
+# FyxLife – Fitness Tracking App 🏃‍♂️💙💜
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+<p align="center">
+  <img src="./assets/images/splash-icon.png" alt="FyxLife Logo" width="200"/>
+</p>
 
-## Get started
+A modern **fitness tracking application** built with **React Native + Expo**.  
+FyxLife helps users set fitness goals, track activities, explore health content, and stay motivated with daily challenges.  
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## 🎥 Demo Video
 
-2. Start the app
+Watch a screen recording of the working app here:  
+[▶️ App Demo](./assets/screenShort/app-demo.mp4)
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 📸 Screenshots
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Here are some previews of various pages of the app:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+| Home | Profile | Goals |
+|------|---------|-------|
+| ![Home](./assets/screenShort/home.png) | ![Profile](./assets/screenShort/profile.png) | ![Goals](./assets/screenShort/goals.png) |
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## ⚡️ Getting Started
 
+Follow these steps to set up and run the project locally:
+
+### 1. Clone the Repository
 ```bash
-npm run reset-project
+git clone https://github.com/yourusername/fyxlife-app.git
+cd fyxlife-app
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Install Dependencies
+Make sure you have Node.js and Expo CLI installed.
 
-## Learn more
+Then install project dependencies:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+yarn install
+or
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+npm install
+```
 
-## Join the community
+### 3. Start the Expo App
+```bash
+npx expo start
+```
+This will launch the Expo Developer Tools in your browser.
+You can then run the app on:
 
-Join our community of developers creating universal apps.
+iOS Simulator (Mac only)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Android Emulator
+
+Physical Device (via Expo Go app)
+
+### 🛠 Frameworks & Tools
+React Native (Expo) – Cross-platform framework
+
+Expo Router – Navigation
+
+Expo Linear Gradient – Modern UI effects
+
+React Native Reanimated & Gesture Handler – Smooth animations
+
+Ionicons – Icons
+
+AI Assistance – For design, documentation, and prototyping
+
+### 📝 Assumptions & Shortcuts
+Local state management used (no backend yet)
+
+Mock data for demo goals and activities
+
+UI simplified for rapid prototyping
+
+### 🔮 Scaling: v0 → v1
+Planned upgrades:
+
+Cloud sync for cross-device persistence
+
+Richer analytics & AI-based personalization
+
+Integration with wearables / health APIs
+
+Daily challenges & reward system
+
+Blogs and health-related content from external sources
+
+Map integration for runners & hikers
+
+---
