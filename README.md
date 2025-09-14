@@ -32,7 +32,7 @@ Follow these steps to set up and run the project locally:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/fyxlife-app.git
+git clone https://github.com/Naman503/FitnessTrackingApp.git
 cd fyxlife-app
 ```
 
